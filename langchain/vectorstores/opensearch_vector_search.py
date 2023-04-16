@@ -60,13 +60,13 @@ def _validate_embeddings_and_bulk_size(embeddings_length: int, bulk_size: int) -
 
 
 def _bulk_ingest_embeddings(
-    client: Any,
-    index_name: str,
-    embeddings: List[List[float]],
-    texts: Iterable[str],
-    metadatas: Optional[List[dict]] = None,
-    vector_field: str = "vector_field",
-    text_field: str = "text",
+        client: Any,
+        index_name: str,
+        embeddings: List[List[float]],
+        texts: Iterable[str],
+        metadatas: Optional[List[dict]] = None,
+        vector_field: str = "vector_field",
+        text_field: str = "text",
 ) -> List[str]:
     """Bulk Ingest Embeddings into given index."""
     bulk = _import_bulk()
@@ -91,8 +91,8 @@ def _bulk_ingest_embeddings(
 
 
 def _default_scripting_text_mapping(
-    dim: int,
-    vector_field: str = "vector_field",
+        dim: int,
+        vector_field: str = "vector_field",
 ) -> Dict:
     """For Painless Scripting or Script Scoring,the default mapping to create index."""
     return {
@@ -105,13 +105,13 @@ def _default_scripting_text_mapping(
 
 
 def _default_text_mapping(
-    dim: int,
-    engine: str = "nmslib",
-    space_type: str = "l2",
-    ef_search: int = 512,
-    ef_construction: int = 512,
-    m: int = 16,
-    vector_field: str = "vector_field",
+        dim: int,
+        engine: str = "nmslib",
+        space_type: str = "l2",
+        ef_search: int = 512,
+        ef_construction: int = 512,
+        m: int = 16,
+        vector_field: str = "vector_field",
 ) -> Dict:
     """For Approximate k-NN Search, this is the default mapping to create index."""
     return {
@@ -134,10 +134,10 @@ def _default_text_mapping(
 
 
 def _default_approximate_search_query(
-    query_vector: List[float],
-    size: int = 4,
-    k: int = 4,
-    vector_field: str = "vector_field",
+        query_vector: List[float],
+        size: int = 4,
+        k: int = 4,
+        vector_field: str = "vector_field",
 ) -> Dict:
     """For Approximate k-NN Search, this is the default query."""
     return {
@@ -147,10 +147,10 @@ def _default_approximate_search_query(
 
 
 def _default_script_query(
-    query_vector: List[float],
-    space_type: str = "l2",
-    pre_filter: Dict = MATCH_ALL_QUERY,
-    vector_field: str = "vector_field",
+        query_vector: List[float],
+        space_type: str = "l2",
+        pre_filter: Dict = MATCH_ALL_QUERY,
+        vector_field: str = "vector_field",
 ) -> Dict:
     """For Script Scoring Search, this is the default query."""
     return {
@@ -172,17 +172,17 @@ def _default_script_query(
 
 
 def __get_painless_scripting_source(
-    space_type: str, query_vector: List[float], vector_field: str = "vector_field"
+        space_type: str, query_vector: List[float], vector_field: str = "vector_field"
 ) -> str:
     """For Painless Scripting, it returns the script source based on space type."""
     source_value = (
-        "(1.0 + "
-        + space_type
-        + "("
-        + str(query_vector)
-        + ", doc['"
-        + vector_field
-        + "']))"
+            "(1.0 + "
+            + space_type
+            + "("
+            + str(query_vector)
+            + ", doc['"
+            + vector_field
+            + "']))"
     )
     if space_type == "cosineSimilarity":
         return source_value
@@ -191,10 +191,10 @@ def __get_painless_scripting_source(
 
 
 def _default_painless_scripting_query(
-    query_vector: List[float],
-    space_type: str = "l2Squared",
-    pre_filter: Dict = MATCH_ALL_QUERY,
-    vector_field: str = "vector_field",
+        query_vector: List[float],
+        space_type: str = "l2Squared",
+        pre_filter: Dict = MATCH_ALL_QUERY,
+        vector_field: str = "vector_field",
 ) -> Dict:
     """For Painless Scripting Search, this is the default query."""
     source = __get_painless_scripting_source(space_type, query_vector)
@@ -237,11 +237,11 @@ class OpenSearchVectorSearch(VectorStore):
     """
 
     def __init__(
-        self,
-        opensearch_url: str,
-        index_name: str,
-        embedding_function: Embeddings,
-        **kwargs: Any,
+            self,
+            opensearch_url: str,
+            index_name: str,
+            embedding_function: Embeddings,
+            **kwargs: Any,
     ):
         """Initialize with necessary components."""
         self.embedding_function = embedding_function
@@ -249,11 +249,11 @@ class OpenSearchVectorSearch(VectorStore):
         self.client = _get_opensearch_client(opensearch_url, **kwargs)
 
     def add_texts(
-        self,
-        texts: Iterable[str],
-        metadatas: Optional[List[dict]] = None,
-        bulk_size: int = 500,
-        **kwargs: Any,
+            self,
+            texts: Iterable[str],
+            metadatas: Optional[List[dict]] = None,
+            bulk_size: int = 500,
+            **kwargs: Any,
     ) -> List[str]:
         """Run more texts through the embeddings and add to the vectorstore.
 
@@ -287,7 +287,7 @@ class OpenSearchVectorSearch(VectorStore):
         )
 
     def similarity_search(
-        self, query: str, k: int = 4, **kwargs: Any
+            self, query: str, k: int = 4, **kwargs: Any
     ) -> List[Document]:
         """Return docs most similar to query.
 
@@ -374,12 +374,12 @@ class OpenSearchVectorSearch(VectorStore):
 
     @classmethod
     def from_texts(
-        cls,
-        texts: List[str],
-        embedding: Embeddings,
-        metadatas: Optional[List[dict]] = None,
-        bulk_size: int = 500,
-        **kwargs: Any,
+            cls,
+            texts: List[str],
+            embedding: Embeddings,
+            metadatas: Optional[List[dict]] = None,
+            bulk_size: int = 500,
+            **kwargs: Any,
     ) -> OpenSearchVectorSearch:
         """Construct OpenSearchVectorSearch wrapper from raw documents.
 
@@ -428,7 +428,10 @@ class OpenSearchVectorSearch(VectorStore):
         opensearch_url = get_from_dict_or_env(
             kwargs, "opensearch_url", "OPENSEARCH_URL"
         )
-        client = _get_opensearch_client(opensearch_url)
+        # Remove the opensearch_url from kwargs to avoid passing
+        # the value twice for argument opensearch_url
+        kwargs.pop("opensearch_url")
+        client = _get_opensearch_client(opensearch_url, **kwargs)
         embeddings = embedding.embed_documents(texts)
         _validate_embeddings_and_bulk_size(len(embeddings), bulk_size)
         dim = len(embeddings[0])
