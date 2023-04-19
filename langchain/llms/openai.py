@@ -155,11 +155,11 @@ class BaseOpenAI(BaseLLM):
         """Initialize the OpenAI object."""
         model_name = data.get("model_name", "")
         if model_name.startswith("gpt-3.5-turbo") or model_name.startswith("gpt-4"):
-            warnings.warn(
-                "You are trying to use a chat model. This way of initializing it is "
-                "no longer supported. Instead, please use: "
-                "`from langchain.chat_models import ChatOpenAI`"
-            )
+            # warnings.warn(
+            #     "You are trying to use a chat model. This way of initializing it is "
+            #     "no longer supported. Instead, please use: "
+            #     "`from langchain.chat_models import ChatOpenAI`"
+            # )
             return OpenAIChat(**data)
         return super().__new__(cls)
 
@@ -658,11 +658,11 @@ class OpenAIChat(BaseLLM):
                 "due to an old version of the openai package. Try upgrading it "
                 "with `pip install --upgrade openai`."
             )
-        warnings.warn(
-            "You are trying to use a chat model. This way of initializing it is "
-            "no longer supported. Instead, please use: "
-            "`from langchain.chat_models import ChatOpenAI`"
-        )
+        # warnings.warn(
+        #     "You are trying to use a chat model. This way of initializing it is "
+        #     "no longer supported. Instead, please use: "
+        #     "`from langchain.chat_models import ChatOpenAI`"
+        # )
         return values
 
     @property
