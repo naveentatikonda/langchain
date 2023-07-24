@@ -69,20 +69,23 @@ def _validate_embeddings_and_bulk_size(embeddings_length: int, bulk_size: int) -
 
 
 def _bulk_ingest_embeddings(
-    client: Any,
-    index_name: str,
-    embeddings: List[List[float]],
-    texts: Iterable[str],
-    metadatas: Optional[List[dict]] = None,
-    vector_field: str = "vector_field",
-    text_field: str = "text",
-    mapping: Dict = {},
+        client: Any,
+        index_name: str,
+        embeddings: List[List[float]],
+        texts: Iterable[str],
+        metadatas: Optional[List[dict]] = None,
+        vector_field: str = "vector_field",
+        text_field: str = "text",
+        mapping: Dict = {},
+        ids: Optional[List[str]] = None,
+        is_serverless_enabled: Optional[bool] = False,
+        max_chunk_bytes: Optional[int] = 1 * 1024 * 1024,
 ) -> List[str]:
     """Bulk Ingest Embeddings into given index."""
     bulk = _import_bulk()
     not_found_error = _import_not_found_error()
     requests = []
-    ids = []
+    return_ids = []
     mapping = mapping
 
     try:
@@ -92,25 +95,29 @@ def _bulk_ingest_embeddings(
 
     for i, text in enumerate(texts):
         metadata = metadatas[i] if metadatas else {}
-        _id = str(uuid.uuid4())
+        id = ids[i] if ids else str(uuid.uuid4())
         request = {
             "_op_type": "index",
             "_index": index_name,
             vector_field: embeddings[i],
             text_field: text,
             "metadata": metadata,
-            "_id": _id,
         }
+        if is_serverless_enabled:
+            request["id"] = id
+        else:
+            request["_id"] = id
         requests.append(request)
-        ids.append(_id)
-    bulk(client, requests)
-    client.indices.refresh(index=index_name)
-    return ids
+        return_ids.append(id)
+    bulk(client, requests, max_chunk_bytes=max_chunk_bytes)
+    if not is_serverless_enabled:
+        client.indices.refresh(index=index_name)
+    return return_ids
 
 
 def _default_scripting_text_mapping(
-    dim: int,
-    vector_field: str = "vector_field",
+        dim: int,
+        vector_field: str = "vector_field",
 ) -> Dict:
     """For Painless Scripting or Script Scoring,the default mapping to create index."""
     return {
@@ -123,13 +130,13 @@ def _default_scripting_text_mapping(
 
 
 def _default_text_mapping(
-    dim: int,
-    engine: str = "nmslib",
-    space_type: str = "l2",
-    ef_search: int = 512,
-    ef_construction: int = 512,
-    m: int = 16,
-    vector_field: str = "vector_field",
+        dim: int,
+        engine: str = "nmslib",
+        space_type: str = "l2",
+        ef_search: int = 512,
+        ef_construction: int = 512,
+        m: int = 16,
+        vector_field: str = "vector_field",
 ) -> Dict:
     """For Approximate k-NN Search, this is the default mapping to create index."""
     return {
@@ -152,10 +159,10 @@ def _default_text_mapping(
 
 
 def _default_approximate_search_query(
-    query_vector: List[float],
-    size: int = 4,
-    k: int = 4,
-    vector_field: str = "vector_field",
+        query_vector: List[float],
+        size: int = 4,
+        k: int = 4,
+        vector_field: str = "vector_field",
 ) -> Dict:
     """For Approximate k-NN Search, this is the default query."""
     return {
@@ -165,12 +172,12 @@ def _default_approximate_search_query(
 
 
 def _approximate_search_query_with_boolean_filter(
-    query_vector: List[float],
-    boolean_filter: Dict,
-    size: int = 4,
-    k: int = 4,
-    vector_field: str = "vector_field",
-    subquery_clause: str = "must",
+        query_vector: List[float],
+        boolean_filter: Dict,
+        size: int = 4,
+        k: int = 4,
+        vector_field: str = "vector_field",
+        subquery_clause: str = "must",
 ) -> Dict:
     """For Approximate k-NN Search, with Boolean Filter."""
     return {
@@ -187,11 +194,11 @@ def _approximate_search_query_with_boolean_filter(
 
 
 def _approximate_search_query_with_lucene_filter(
-    query_vector: List[float],
-    lucene_filter: Dict,
-    size: int = 4,
-    k: int = 4,
-    vector_field: str = "vector_field",
+        query_vector: List[float],
+        lucene_filter: Dict,
+        size: int = 4,
+        k: int = 4,
+        vector_field: str = "vector_field",
 ) -> Dict:
     """For Approximate k-NN Search, with Lucene Filter."""
     search_query = _default_approximate_search_query(
@@ -202,10 +209,10 @@ def _approximate_search_query_with_lucene_filter(
 
 
 def _default_script_query(
-    query_vector: List[float],
-    space_type: str = "l2",
-    pre_filter: Dict = MATCH_ALL_QUERY,
-    vector_field: str = "vector_field",
+        query_vector: List[float],
+        space_type: str = "l2",
+        pre_filter: Dict = MATCH_ALL_QUERY,
+        vector_field: str = "vector_field",
 ) -> Dict:
     """For Script Scoring Search, this is the default query."""
     return {
@@ -227,17 +234,17 @@ def _default_script_query(
 
 
 def __get_painless_scripting_source(
-    space_type: str, query_vector: List[float], vector_field: str = "vector_field"
+        space_type: str, query_vector: List[float], vector_field: str = "vector_field"
 ) -> str:
     """For Painless Scripting, it returns the script source based on space type."""
     source_value = (
-        "(1.0 + "
-        + space_type
-        + "("
-        + str(query_vector)
-        + ", doc['"
-        + vector_field
-        + "']))"
+            "(1.0 + "
+            + space_type
+            + "("
+            + str(query_vector)
+            + ", doc['"
+            + vector_field
+            + "']))"
     )
     if space_type == "cosineSimilarity":
         return source_value
@@ -246,10 +253,10 @@ def __get_painless_scripting_source(
 
 
 def _default_painless_scripting_query(
-    query_vector: List[float],
-    space_type: str = "l2Squared",
-    pre_filter: Dict = MATCH_ALL_QUERY,
-    vector_field: str = "vector_field",
+        query_vector: List[float],
+        space_type: str = "l2Squared",
+        pre_filter: Dict = MATCH_ALL_QUERY,
+        vector_field: str = "vector_field",
 ) -> Dict:
     """For Painless Scripting Search, this is the default query."""
     source = __get_painless_scripting_source(space_type, query_vector)
@@ -292,11 +299,11 @@ class OpenSearchVectorSearch(VectorStore):
     """
 
     def __init__(
-        self,
-        opensearch_url: str,
-        index_name: str,
-        embedding_function: Embeddings,
-        **kwargs: Any,
+            self,
+            opensearch_url: str,
+            index_name: str,
+            embedding_function: Embeddings,
+            **kwargs: Any,
     ):
         """Initialize with necessary components."""
         self.embedding_function = embedding_function
@@ -304,11 +311,11 @@ class OpenSearchVectorSearch(VectorStore):
         self.client = _get_opensearch_client(opensearch_url, **kwargs)
 
     def add_texts(
-        self,
-        texts: Iterable[str],
-        metadatas: Optional[List[dict]] = None,
-        bulk_size: int = 500,
-        **kwargs: Any,
+            self,
+            texts: Iterable[str],
+            metadatas: Optional[List[dict]] = None,
+            bulk_size: int = 500,
+            **kwargs: Any,
     ) -> List[str]:
         """Run more texts through the embeddings and add to the vectorstore.
 
@@ -337,6 +344,9 @@ class OpenSearchVectorSearch(VectorStore):
         ef_construction = _get_kwargs_value(kwargs, "ef_construction", 512)
         m = _get_kwargs_value(kwargs, "m", 16)
         vector_field = _get_kwargs_value(kwargs, "vector_field", "vector_field")
+        max_chunk_bytes = _get_kwargs_value(kwargs, "max_chunk_bytes", 1 * 1024 * 1024)
+        is_serverless_enabled = _get_kwargs_value(kwargs, "is_serverless_enabled", False)
+        ids = _get_kwargs_value(kwargs, "ids", None)
 
         mapping = _default_text_mapping(
             dim, engine, space_type, ef_search, ef_construction, m, vector_field
@@ -351,10 +361,13 @@ class OpenSearchVectorSearch(VectorStore):
             vector_field,
             text_field,
             mapping,
+            ids,
+            is_serverless_enabled,
+            max_chunk_bytes
         )
 
     def similarity_search(
-        self, query: str, k: int = 4, **kwargs: Any
+            self, query: str, k: int = 4, **kwargs: Any
     ) -> List[Document]:
         """Return docs most similar to query.
 
@@ -468,12 +481,12 @@ class OpenSearchVectorSearch(VectorStore):
 
     @classmethod
     def from_texts(
-        cls,
-        texts: List[str],
-        embedding: Embeddings,
-        metadatas: Optional[List[dict]] = None,
-        bulk_size: int = 500,
-        **kwargs: Any,
+            cls,
+            texts: List[str],
+            embedding: Embeddings,
+            metadatas: Optional[List[dict]] = None,
+            bulk_size: int = 500,
+            **kwargs: Any,
     ) -> OpenSearchVectorSearch:
         """Construct OpenSearchVectorSearch wrapper from raw documents.
 
@@ -535,6 +548,9 @@ class OpenSearchVectorSearch(VectorStore):
             "ef_search",
             "ef_construction",
             "m",
+            "max_chunk_bytes",
+            "is_serverless_enabled",
+            "ids"
         ]
         embeddings = embedding.embed_documents(texts)
         _validate_embeddings_and_bulk_size(len(embeddings), bulk_size)
@@ -547,6 +563,9 @@ class OpenSearchVectorSearch(VectorStore):
         is_appx_search = _get_kwargs_value(kwargs, "is_appx_search", True)
         vector_field = _get_kwargs_value(kwargs, "vector_field", "vector_field")
         text_field = _get_kwargs_value(kwargs, "text_field", "text")
+        max_chunk_bytes = _get_kwargs_value(kwargs, "max_chunk_bytes", 1 * 1024 * 1024)
+        is_serverless_enabled = _get_kwargs_value(kwargs, "is_serverless_enabled", False)
+        ids = _get_kwargs_value(kwargs, "ids", None)
         if is_appx_search:
             engine = _get_kwargs_value(kwargs, "engine", "nmslib")
             space_type = _get_kwargs_value(kwargs, "space_type", "l2")
@@ -571,5 +590,8 @@ class OpenSearchVectorSearch(VectorStore):
             vector_field,
             text_field,
             mapping,
+            ids,
+            is_serverless_enabled,
+            max_chunk_bytes
         )
         return cls(opensearch_url, index_name, embedding, **kwargs)
