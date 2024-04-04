@@ -45,6 +45,8 @@ from sqlalchemy import Column, Integer, String, create_engine, select
 from sqlalchemy.engine.base import Engine
 from sqlalchemy.orm import Session
 
+from langchain.vectorstores import OpenSearchVectorSearch as OpenSearchVectorStore
+
 try:
     from sqlalchemy.orm import declarative_base
 except ImportError:
@@ -1051,3 +1053,82 @@ class CassandraSemanticCache(BaseCache):
     def clear(self, **kwargs: Any) -> None:
         """Clear the *whole* semantic cache."""
         self.table.clear()
+
+class OpenSearchSemanticCache(BaseCache):
+
+    def __init__(
+        self, opensearch_url: str, embedding: Embeddings, score_threshold: float = 0.2
+    ):
+        """Initialize by passing in the `init` GPTCache func
+
+        Args:
+            redis_url (str): URL to connect to Redis.
+            embedding (Embedding): Embedding provider for semantic encoding and search.
+            score_threshold (float, 0.2):
+
+        Example:
+
+        .. code-block:: python
+
+            import langchain
+
+            from langchain.cache import RedisSemanticCache
+            from langchain.embeddings import OpenAIEmbeddings
+
+            langchain.llm_cache = RedisSemanticCache(
+                redis_url="redis://localhost:6379",
+                embedding=OpenAIEmbeddings()
+            )
+
+        """
+        self._cache_dict: Dict[str, OpenSearchVectorStore] = {}
+        self.redis_url = opensearch_url
+        self.embedding = embedding
+        self.score_threshold = score_threshold
+
+    def _index_name(self, llm_string: str) -> str:
+        hashed_index = _hash(llm_string)
+        return f"cache:{hashed_index}"
+
+    def _get_llm_cache(self, llm_string: str) -> OpenSearchVectorStore:
+        index_name = self._index_name(llm_string)
+
+        # return vectorstore client for the specific llm string
+        if index_name in self._cache_dict:
+            return self._cache_dict[index_name]
+
+        # create new vectorstore client for the specific llm string
+        try:
+            self._cache_dict[index_name] = OpenSearchVectorStore.from_existing_index(
+                embedding=self.embedding,
+                index_name=index_name,
+                opensearch_url=self.opensearch_url,
+                schema=cast(Dict, self.DEFAULT_SCHEMA),
+            )
+        except ValueError:
+            redis = OpenSearchVectorStore(
+                embedding=self.embedding,
+                index_name=index_name,
+                redis_url=self.redis_url,
+                index_schema=cast(Dict, self.DEFAULT_SCHEMA),
+            )
+            _embedding = self.embedding.embed_query(text="test")
+            redis._create_index(dim=len(_embedding))
+            self._cache_dict[index_name] = redis
+
+        return self._cache_dict[index_name]
+
+    def lookup(self, prompt: str, llm_string: str) -> Optional[RETURN_VAL_TYPE]:
+        pass
+
+    def update(self, prompt: str, llm_string: str, return_val: RETURN_VAL_TYPE) -> None:
+        pass
+
+    def clear(self, **kwargs: Any) -> None:
+        """Clear semantic cache for a given llm_string."""
+        index_name = self._index_name(kwargs["llm_string"])
+        if index_name in self._cache_dict:
+            self._cache_dict[index_name].drop_index(
+                index_name=index_name, delete_documents=True, redis_url=self.redis_url
+            )
+            del self._cache_dict[index_name]
